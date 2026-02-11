@@ -15,9 +15,21 @@ const app = express();
 
 app.set("trust proxy", 1);
 
+// ✅ FIX: trim CLIENT_ORIGIN to remove hidden newline/spaces
+const allowedOrigin = (process.env.CLIENT_ORIGIN || "http://localhost:3000").trim();
+
 app.use(
   cors({
-    origin: process.env.CLIENT_ORIGIN || "http://localhost:3000",
+    origin: function (origin, callback) {
+      // allow server-to-server / Postman (no origin header)
+      if (!origin) return callback(null, true);
+
+      // allow only your frontend origin
+      if (origin === allowedOrigin) return callback(null, true);
+
+      // block everything else
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
     credentials: true
   })
 );
@@ -39,5 +51,6 @@ console.log("DEBUG MONGODB_URI =", process.env.MONGODB_URI);
 
 connectDB(process.env.MONGODB_URI).then(async () => {
   await ensureAdminSeed();
-  app.listen(PORT, () => console.log(`✅ Backend running: http://localhost:${PORT}`));
+  // ✅ log correct port (Render won't be localhost, but it's fine)
+  app.listen(PORT, () => console.log(`✅ Backend running on port: ${PORT}`));
 });
